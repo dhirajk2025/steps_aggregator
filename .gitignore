@@ -1,0 +1,19 @@
+# Internal process documents — do not commit to git
+*.pdf
+*.txt
+
+# Claude local project files
+.claude/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / credentials
+*.env
+.env*
+*_creds*
+
+# OS
+.DS_Store
