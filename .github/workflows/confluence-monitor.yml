@@ -45,44 +45,7 @@ jobs:
 
       - name: Create GitHub issues for process updates
         if: steps.monitor.outputs.changes_detected == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const report = JSON.parse(fs.readFileSync('/tmp/monitor-report.json', 'utf8'));
-            for (const change of report.changes) {
-              const phases = change.affected_phases.length > 0
-                ? change.affected_phases.map(p => '- ' + p).join('\n')
-                : '- (unknown - review manually)';
-              const title = 'Process Update: ' + change.title + ' changed (v' + change.old_version + ' to v' + change.new_version + ')';
-              const body = [
-                '## Process Document Updated',
-                '',
-                '**Page:** [' + change.title + '](' + change.page_url + ')',
-                '**Version change:** v' + change.old_version + ' to v' + change.new_version,
-                '**Detected:** ' + report.run_date,
-                '',
-                '## What Changed',
-                '',
-                change.summary,
-                '',
-                '## Affected Checklist Phases',
-                '',
-                phases,
-                '',
-                '## Action Required',
-                '',
-                'Review the updated Confluence page and update Beads checklist tasks if the process has changed.',
-                '',
-                '- [ ] Review the Confluence page',
-                '- [ ] Update Beads checklist tasks if needed',
-                '- [ ] Close this issue when reviewed',
-              ].join('\n');
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: title,
-                body: body,
-                labels: ['process-update', 'compliance'],
-              });
-            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: python3 scripts/create_issues.py
