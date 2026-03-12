@@ -1,0 +1,89 @@
+name: Confluence Compliance Monitor
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # Daily at 9am UTC
+  workflow_dispatch:        # Manual trigger
+
+permissions:
+  contents: write   # to commit updated versions.json
+  issues: write     # to open GitHub issue
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests anthropic
+
+      - name: Run monitor
+        id: monitor
+        env:
+          CONFLUENCE_EMAIL: ${{ secrets.CONFLUENCE_EMAIL }}
+          CONFLUENCE_API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          CONFLUENCE_BASE_URL: https://idmeinc.atlassian.net
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 scripts/monitor.py
+
+      - name: Commit updated versions.json
+        if: steps.monitor.outputs.changes_detected == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add versions.json
+          git commit -m "chore: update versions.json after Confluence change detection [skip ci]"
+          git push
+
+      - name: Create GitHub issue for process update
+        if: steps.monitor.outputs.changes_detected == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = require('/tmp/monitor-report.json');
+            for (const change of report.changes) {
+              const phases = change.affected_phases.length
+                ? change.affected_phases.map(p => `- ${p}`).join('\n')
+                : '- (unknown — review manually)';
+
+              const body = `## Process Document Updated
+
+**Page:** [${change.title}](${change.page_url})
+**Version change:** v${change.old_version} → v${change.new_version}
+**Detected:** ${report.run_date}
+
+## What Changed
+
+${change.summary}
+
+## Affected Checklist Phases
+
+${phases}
+
+## Action Required
+
+Review the updated Confluence page and update the relevant Beads checklist tasks if the process has changed in a way that affects compliance steps.
+
+- [ ] Review the Confluence page
+- [ ] Update Beads checklist tasks if needed
+- [ ] Close this issue when reviewed
+
+---
+*This issue was automatically created by the [Confluence Compliance Monitor](../../actions/workflows/confluence-monitor.yml) workflow.*`;
+
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Process Update: ${change.title} changed (v${change.old_version} → v${change.new_version})`,
+                body: body,
+                labels: ['process-update', 'compliance'],
+              });
+            }

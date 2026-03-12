@@ -105,11 +105,58 @@ python3 scripts/confluence_ingest.py
 | DB schema — deleted_at | ✅ | Present on face_records, face_catalogs, cataloged_face_records, inspections |
 | DRS — delete strategy | 🚩 | Schema uses **soft delete** (`deleted_at IS NULL`); biometric data requires **hard delete** per DRS policy |
 
+## Scheduled Monitoring
+
+A GitHub Actions workflow (`confluence-monitor.yml`) runs daily at 9am UTC to detect Confluence page updates.
+
+### How it works
+
+1. Reads `versions.json` (committed to repo) to know last-known versions
+2. Fetches current version from Confluence API for each tracked page
+3. On version change: calls Claude (`claude-sonnet-4-6`) to summarize what changed and which checklist phases are affected
+4. Commits updated `versions.json` to git (auditable version history)
+5. Opens a GitHub issue with the change summary and a review checklist
+
+### Setup: GitHub Secrets
+
+Add these secrets at `Settings → Secrets and variables → Actions`:
+
+| Secret | Value |
+|--------|-------|
+| `CONFLUENCE_EMAIL` | `dhiraj.kulkarni@id.me` |
+| `CONFLUENCE_API_TOKEN` | Classic Atlassian token |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+
+### Manual trigger
+
+Go to **Actions → Confluence Compliance Monitor → Run workflow**.
+
+### Local run
+
+```bash
+export CONFLUENCE_EMAIL="dhiraj.kulkarni@id.me"
+export CONFLUENCE_API_TOKEN="your-token"
+export CONFLUENCE_BASE_URL="https://idmeinc.atlassian.net"
+export ANTHROPIC_API_KEY="your-key"
+pip3 install requests anthropic
+python3 scripts/monitor.py
+```
+
+Expected output when versions are current: `Result: 0 change(s) detected`
+
+### Testing end-to-end
+
+Temporarily lower a version number in `versions.json`, then run the monitor — it will detect the "change" and exercise the full Claude + GitHub issue flow.
+
 ## Scripts
+
+### `scripts/monitor.py`
+
+Automated version-change monitor. Run by GitHub Actions daily; also runnable locally (see above).
 
 ### `scripts/confluence_ingest.py`
 
-Fetches Confluence pages, detects version changes, and saves content for ChromaDB ingestion.
+Manual ingestion script. Fetches Confluence pages and saves content for MCP-based ChromaDB ingestion.
 
 **Setup:**
 ```bash
