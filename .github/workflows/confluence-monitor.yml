@@ -2,12 +2,12 @@ name: Confluence Compliance Monitor
 
 on:
   schedule:
-    - cron: '0 9 * * *'   # Daily at 9am UTC
-  workflow_dispatch:        # Manual trigger
+    - cron: '0 9 * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write   # to commit updated versions.json
-  issues: write     # to open GitHub issue
+  contents: write
+  issues: write
 
 jobs:
   monitor:
@@ -43,46 +43,45 @@ jobs:
           git commit -m "chore: update versions.json after Confluence change detection [skip ci]"
           git push
 
-      - name: Create GitHub issue for process update
+      - name: Create GitHub issues for process updates
         if: steps.monitor.outputs.changes_detected == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const report = require('/tmp/monitor-report.json');
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('/tmp/monitor-report.json', 'utf8'));
             for (const change of report.changes) {
-              const phases = change.affected_phases.length
-                ? change.affected_phases.map(p => `- ${p}`).join('\n')
-                : '- (unknown — review manually)';
-
-              const body = `## Process Document Updated
-
-**Page:** [${change.title}](${change.page_url})
-**Version change:** v${change.old_version} → v${change.new_version}
-**Detected:** ${report.run_date}
-
-## What Changed
-
-${change.summary}
-
-## Affected Checklist Phases
-
-${phases}
-
-## Action Required
-
-Review the updated Confluence page and update the relevant Beads checklist tasks if the process has changed in a way that affects compliance steps.
-
-- [ ] Review the Confluence page
-- [ ] Update Beads checklist tasks if needed
-- [ ] Close this issue when reviewed
-
----
-*This issue was automatically created by the [Confluence Compliance Monitor](../../actions/workflows/confluence-monitor.yml) workflow.*`;
-
+              const phases = change.affected_phases.length > 0
+                ? change.affected_phases.map(p => '- ' + p).join('\n')
+                : '- (unknown - review manually)';
+              const title = 'Process Update: ' + change.title + ' changed (v' + change.old_version + ' to v' + change.new_version + ')';
+              const body = [
+                '## Process Document Updated',
+                '',
+                '**Page:** [' + change.title + '](' + change.page_url + ')',
+                '**Version change:** v' + change.old_version + ' to v' + change.new_version,
+                '**Detected:** ' + report.run_date,
+                '',
+                '## What Changed',
+                '',
+                change.summary,
+                '',
+                '## Affected Checklist Phases',
+                '',
+                phases,
+                '',
+                '## Action Required',
+                '',
+                'Review the updated Confluence page and update Beads checklist tasks if the process has changed.',
+                '',
+                '- [ ] Review the Confluence page',
+                '- [ ] Update Beads checklist tasks if needed',
+                '- [ ] Close this issue when reviewed',
+              ].join('\n');
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `Process Update: ${change.title} changed (v${change.old_version} → v${change.new_version})`,
+                title: title,
                 body: body,
                 labels: ['process-update', 'compliance'],
               });
