@@ -36,6 +36,7 @@ def create_issue(token: str, repo: str, title: str, body: str) -> str:
     return resp.json()["html_url"]
 
 
+
 def main():
     token = os.environ.get("GITHUB_TOKEN")
     repo = os.environ.get("GITHUB_REPO")

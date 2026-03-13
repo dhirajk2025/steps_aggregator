@@ -84,6 +84,7 @@ def try_ingest_to_chromadb(page_id: str, title: str, version: int, category: str
                 metadata={"description": "ID.me engineering process documents from Confluence"},
             )
 
+
         # Remove old versions for this page
         try:
             existing = collection.get(where={"page_id": page_id}, include=["metadatas"])
