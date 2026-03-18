@@ -83,6 +83,29 @@ Review the updated Confluence page and update Beads checklist tasks if the proce
         url = create_issue(token, repo, title, body)
         print(f"Created issue: {url}")
 
+    for j in report.get("jira_epic_changes", []):
+        phase = f" [{j['phase']}]" if j.get("phase") else ""
+        title = f"Jira Epic Status Change: {j['epic_key']} → {j['new_status']}{phase}"
+        owner_line = f"\n**Owner:** {j['owner']}" if j.get("owner") else ""
+        body = f"""\
+## Jira Epic Status Changed
+
+**Epic:** [{j['epic_key']} — {j['title']}]({j['url']})
+**Status change:** {j['old_status']} → {j['new_status']}
+**Phase:** {j.get('phase', 'unknown')}
+**Detected:** {report['run_date']}{owner_line}
+
+## Action Required
+
+Review whether this epic's new status requires updating Beads checklist tasks or compliance artifacts.
+
+- [ ] Review the Jira epic
+- [ ] Update Beads checklist tasks if needed
+- [ ] Close this issue when reviewed
+"""
+        url = create_issue(token, repo, title, body)
+        print(f"Created issue: {url}")
+
 
 if __name__ == "__main__":
     main()

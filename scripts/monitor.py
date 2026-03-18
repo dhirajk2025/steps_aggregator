@@ -155,6 +155,53 @@ Respond in JSON with this exact structure:
         return json.loads(json_match.group())
     return {"summary": raw, "affected_phases": []}
 
+# ── Jira epic status tracking ──────────────────────────────────────────────────
+
+def check_jira_epic_changes(versions: dict) -> list[dict]:
+    """Detect status changes in tracked Jira epics. Updates versions in-place."""
+    email = os.environ.get("CONFLUENCE_EMAIL", "")
+    token = os.environ.get("CONFLUENCE_API_TOKEN", "")
+    base_url = os.environ.get("CONFLUENCE_BASE_URL", "").rstrip("/")
+
+    if not all([email, token, base_url]):
+        return []
+
+    jira_epics = versions.get("jira_epics", {})
+    if not jira_epics:
+        return []
+
+    changes = []
+    today = date.today().isoformat()
+
+    for epic_key, record in jira_epics.items():
+        url = f"{base_url}/rest/api/3/issue/{epic_key}?fields=summary,status,assignee"
+        try:
+            resp = requests.get(url, auth=(email, token), timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            new_status = data["fields"]["status"]["name"]
+            old_status = record.get("status", "unknown")
+            record["last_checked"] = today
+
+            if new_status != old_status:
+                changes.append({
+                    "epic_key": epic_key,
+                    "title": data["fields"]["summary"],
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "phase": record.get("phase", ""),
+                    "owner": record.get("owner", ""),
+                    "url": f"{base_url}/browse/{epic_key}",
+                })
+                record["status"] = new_status
+                print(f"  JIRA CHANGED: {epic_key} {old_status!r} → {new_status!r}")
+            else:
+                print(f"  {epic_key}: No change ({new_status})")
+        except Exception as e:
+            print(f"  {epic_key}: Error — {e}", file=sys.stderr)
+
+    return changes
+
 # ── Google Docs staleness check ────────────────────────────────────────────────
 
 def check_stale_gdrive_docs(versions: dict) -> list[dict]:
@@ -203,6 +250,16 @@ def main():
 
     changes = []
     errors = []
+
+    # Check Jira epic status changes
+    print("Checking Jira epics for status changes...")
+    jira_changes = check_jira_epic_changes(versions)
+    if jira_changes:
+        print(f"⚠️  {len(jira_changes)} Jira epic(s) changed status:")
+        for j in jira_changes:
+            print(f"  - {j['epic_key']} ({j['title']}): {j['old_status']} → {j['new_status']}")
+    print()
+
     stale_gdrive = check_stale_gdrive_docs(versions)
     if stale_gdrive:
         print(f"⚠️  {len(stale_gdrive)} stale Google Doc(s) need re-ingestion:")
@@ -214,7 +271,7 @@ def main():
         print()
 
     for page_id, record in versions.items():
-        if page_id == "gdrive_docs":
+        if page_id in ("gdrive_docs", "jira_epics"):
             continue
         title = record["title"]
         known_version = record["version"]
@@ -281,6 +338,7 @@ def main():
         "changes_detected": len(changes) > 0,
         "changes_count": len(changes),
         "changes": changes,
+        "jira_epic_changes": jira_changes,
         "stale_gdrive_docs": stale_gdrive,
         "errors": errors,
     }
@@ -289,7 +347,7 @@ def main():
     print(f"Report written to {REPORT_FILE}")
 
     # GitHub Actions outputs
-    has_action_items = len(changes) > 0 or len(stale_gdrive) > 0
+    has_action_items = len(changes) > 0 or len(stale_gdrive) > 0 or len(jira_changes) > 0
     set_github_output("changes_detected", str(has_action_items).lower())
     set_github_output("changes_count", str(len(changes)))
     summary_lines = []
@@ -305,10 +363,16 @@ def main():
             f"- **{doc['title']}** (Google Doc): stale — last ingested {doc['last_ingested']} "
             f"({doc['days_stale']} days ago){jira} — {doc['url']}"
         )
+    for j in jira_changes:
+        phase = f" [{j['phase']}]" if j.get("phase") else ""
+        summary_lines.append(
+            f"- **{j['epic_key']} {j['title']}**{phase}: {j['old_status']} → {j['new_status']} — {j['url']}"
+        )
     set_github_output("change_summary", "\n".join(summary_lines) if summary_lines else "No changes detected")
 
     # Summary
-    print(f"\nResult: {len(changes)} change(s) detected, {len(stale_gdrive)} stale Google Doc(s), {len(errors)} error(s)")
+    print(f"\nResult: {len(changes)} change(s) detected, {len(jira_changes)} Jira epic change(s), "
+          f"{len(stale_gdrive)} stale Google Doc(s), {len(errors)} error(s)")
     if changes:
         for c in changes:
             print(f"  {c['title']}: v{c['old_version']} → v{c['new_version']}")
