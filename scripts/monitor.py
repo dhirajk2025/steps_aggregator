@@ -172,6 +172,8 @@ def check_stale_gdrive_docs(versions: dict) -> list[dict]:
                 "last_ingested": record["last_ingested"],
                 "days_stale": (today - last_ingested).days,
                 "source_confluence_page": record.get("source_confluence_page"),
+                "jira_ticket": record.get("jira_ticket"),
+                "owner": record.get("owner"),
             })
     return stale
 
@@ -205,7 +207,9 @@ def main():
     if stale_gdrive:
         print(f"⚠️  {len(stale_gdrive)} stale Google Doc(s) need re-ingestion:")
         for doc in stale_gdrive:
-            print(f"  - {doc['title']} (last ingested {doc['last_ingested']}, {doc['days_stale']} days ago)")
+            jira = f" · Jira: {doc['jira_ticket']}" if doc.get("jira_ticket") else ""
+            owner = f" · Owner: {doc['owner']}" if doc.get("owner") else ""
+            print(f"  - {doc['title']} (last ingested {doc['last_ingested']}, {doc['days_stale']} days ago{jira}{owner})")
             print(f"    {doc['url']}")
         print()
 
@@ -296,9 +300,10 @@ def main():
             f"(affects: {phases})"
         )
     for doc in stale_gdrive:
+        jira = f" · Jira: {doc['jira_ticket']}" if doc.get("jira_ticket") else ""
         summary_lines.append(
             f"- **{doc['title']}** (Google Doc): stale — last ingested {doc['last_ingested']} "
-            f"({doc['days_stale']} days ago) — {doc['url']}"
+            f"({doc['days_stale']} days ago){jira} — {doc['url']}"
         )
     set_github_output("change_summary", "\n".join(summary_lines) if summary_lines else "No changes detected")
 

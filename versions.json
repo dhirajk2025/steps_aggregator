@@ -13,9 +13,13 @@
       "stale_after_days": 30
     },
     "face-api-prr-doc": {
-      "title": "Face API PRR",
+      "title": "Face Platform API - Production Readiness Review",
       "doc_ids": ["face-api-prr-doc"],
       "url": "https://docs.google.com/document/d/1NxG7VznF_UubU3wUmoLRPSzVX7PHyRJQtlLMIsxIP2Q",
+      "jira_ticket": "PRFL",
+      "owner": "gaurav.chaubal@id.me",
+      "prr_approved_by": "Geoffrey Claro",
+      "prr_approved_date": "2025-11-25",
       "last_ingested": "2026-03-18",
       "stale_after_days": 14
     },
