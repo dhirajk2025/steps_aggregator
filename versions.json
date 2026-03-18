@@ -1,4 +1,14 @@
 {
+  "gdrive_docs": {
+    "18waD6Rrhotlde6hJEw6mhGT7VDt5YHVj5KpjdG6oNxQ": {
+      "title": "Production Readiness Review Template",
+      "doc_ids": ["prr-template-golive-mvp", "prr-template-fast-follow", "prr-template-planning"],
+      "url": "https://docs.google.com/document/d/18waD6Rrhotlde6hJEw6mhGT7VDt5YHVj5KpjdG6oNxQ",
+      "source_confluence_page": "4034101286",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 30
+    }
+  },
   "4034101286": {
     "title": "Production Readiness Review Process",
     "version": 6,

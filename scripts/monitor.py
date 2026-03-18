@@ -22,7 +22,7 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import anthropic
@@ -155,6 +155,26 @@ Respond in JSON with this exact structure:
         return json.loads(json_match.group())
     return {"summary": raw, "affected_phases": []}
 
+# ── Google Docs staleness check ────────────────────────────────────────────────
+
+def check_stale_gdrive_docs(versions: dict) -> list[dict]:
+    """Return list of Google Docs that haven't been re-ingested within stale_after_days."""
+    stale = []
+    gdrive_docs = versions.get("gdrive_docs", {})
+    today = date.today()
+    for doc_key, record in gdrive_docs.items():
+        last_ingested = date.fromisoformat(record.get("last_ingested", "2000-01-01"))
+        stale_after = record.get("stale_after_days", 30)
+        if (today - last_ingested) >= timedelta(days=stale_after):
+            stale.append({
+                "title": record["title"],
+                "url": record["url"],
+                "last_ingested": record["last_ingested"],
+                "days_stale": (today - last_ingested).days,
+                "source_confluence_page": record.get("source_confluence_page"),
+            })
+    return stale
+
 # ── GitHub Actions outputs ─────────────────────────────────────────────────────
 
 def set_github_output(key: str, value: str):
@@ -181,8 +201,17 @@ def main():
 
     changes = []
     errors = []
+    stale_gdrive = check_stale_gdrive_docs(versions)
+    if stale_gdrive:
+        print(f"⚠️  {len(stale_gdrive)} stale Google Doc(s) need re-ingestion:")
+        for doc in stale_gdrive:
+            print(f"  - {doc['title']} (last ingested {doc['last_ingested']}, {doc['days_stale']} days ago)")
+            print(f"    {doc['url']}")
+        print()
 
     for page_id, record in versions.items():
+        if page_id == "gdrive_docs":
+            continue
         title = record["title"]
         known_version = record["version"]
         doc_id = record["doc_id"]
@@ -248,6 +277,7 @@ def main():
         "changes_detected": len(changes) > 0,
         "changes_count": len(changes),
         "changes": changes,
+        "stale_gdrive_docs": stale_gdrive,
         "errors": errors,
     }
     with open(REPORT_FILE, "w") as f:
@@ -255,22 +285,25 @@ def main():
     print(f"Report written to {REPORT_FILE}")
 
     # GitHub Actions outputs
-    set_github_output("changes_detected", str(len(changes) > 0).lower())
+    has_action_items = len(changes) > 0 or len(stale_gdrive) > 0
+    set_github_output("changes_detected", str(has_action_items).lower())
     set_github_output("changes_count", str(len(changes)))
-    if changes:
-        summary_lines = []
-        for c in changes:
-            phases = ", ".join(c["affected_phases"]) if c["affected_phases"] else "unknown"
-            summary_lines.append(
-                f"- **{c['title']}**: v{c['old_version']} → v{c['new_version']} "
-                f"(affects: {phases})"
-            )
-        set_github_output("change_summary", "\n".join(summary_lines))
-    else:
-        set_github_output("change_summary", "No changes detected")
+    summary_lines = []
+    for c in changes:
+        phases = ", ".join(c["affected_phases"]) if c["affected_phases"] else "unknown"
+        summary_lines.append(
+            f"- **{c['title']}**: v{c['old_version']} → v{c['new_version']} "
+            f"(affects: {phases})"
+        )
+    for doc in stale_gdrive:
+        summary_lines.append(
+            f"- **{doc['title']}** (Google Doc): stale — last ingested {doc['last_ingested']} "
+            f"({doc['days_stale']} days ago) — {doc['url']}"
+        )
+    set_github_output("change_summary", "\n".join(summary_lines) if summary_lines else "No changes detected")
 
     # Summary
-    print(f"\nResult: {len(changes)} change(s) detected, {len(errors)} error(s)")
+    print(f"\nResult: {len(changes)} change(s) detected, {len(stale_gdrive)} stale Google Doc(s), {len(errors)} error(s)")
     if changes:
         for c in changes:
             print(f"  {c['title']}: v{c['old_version']} → v{c['new_version']}")

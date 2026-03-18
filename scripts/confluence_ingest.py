@@ -78,6 +78,12 @@ def html_to_text(html: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
+
+def extract_gdrive_links(html: str) -> list[str]:
+    """Extract unique Google Doc/Drive URLs from Confluence page HTML."""
+    pattern = r'https://docs\.google\.com/(?:document|spreadsheets|presentation)/d/[A-Za-z0-9_-]+'
+    return sorted(set(re.findall(pattern, html)))
+
 # ── ChromaDB client ────────────────────────────────────────────────────────────
 
 def get_collection():
@@ -156,6 +162,8 @@ def main():
             # stored_version = get_stored_version(collection, page_config["doc_id"])
 
             # Save to a JSON file for MCP-based ingestion
+            html = page_data["body"]["storage"]["value"]
+            gdrive_links = extract_gdrive_links(html)
             out = {
                 "page_id": page_id,
                 "doc_id": page_config["doc_id"],
@@ -163,7 +171,8 @@ def main():
                 "title": page_data["title"],
                 "category": page_config["category"],
                 "url": f"{os.environ['CONFLUENCE_BASE_URL']}/wiki/pages/viewpage.action?pageId={page_id}",
-                "text": html_to_text(page_data["body"]["storage"]["value"]),
+                "text": html_to_text(html),
+                "gdrive_links": gdrive_links,
                 "last_updated_by": page_data["version"].get("by", {}).get("email", "unknown"),
                 "fetched_at": datetime.now().isoformat(),
             }
@@ -175,6 +184,10 @@ def main():
             print(f"  Saved to: {out_path}")
             print(f"  Title: {out['title']}")
             print(f"  Content length: {len(out['text'])} chars")
+            if gdrive_links:
+                print(f"  Google Doc links found ({len(gdrive_links)}):")
+                for link in gdrive_links:
+                    print(f"    {link}")
 
         except Exception as e:
             print(f"  ERROR: {e}", file=sys.stderr)
