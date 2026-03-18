@@ -11,6 +11,55 @@
       "source_confluence_page": "4034101286",
       "last_ingested": "2026-03-18",
       "stale_after_days": 30
+    },
+    "face-api-prr-doc": {
+      "title": "Face API PRR",
+      "doc_ids": ["face-api-prr-doc"],
+      "url": "https://docs.google.com/document/d/1NxG7VznF_UubU3wUmoLRPSzVX7PHyRJQtlLMIsxIP2Q",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 14
+    },
+    "face-liveness-arb": {
+      "title": "Face Liveness ARB",
+      "doc_ids": ["face-liveness-arb"],
+      "url": "https://docs.google.com/document/d/1JsKWtwVGkgwTAXYdxbGhWc8UYjiqOegCgZtr9HN0SXk",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 30
+    },
+    "face-enroll-search-api": {
+      "title": "Face Enroll/Search API",
+      "doc_ids": ["face-enroll-search-api"],
+      "url": "https://docs.google.com/document/d/1Mj6UbJktL2ZXubX8J5thxn9sW0PYepKqnjuXEO1354U",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 30
+    },
+    "face-delete-search-api": {
+      "title": "Face Delete/Search API",
+      "doc_ids": ["face-delete-search-api"],
+      "url": "https://docs.google.com/document/d/1WkTZgtgV8PVa7JVx6tLqwwjFWqLaJ2_fvFMePpFljZk",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 30
+    },
+    "face-catalog-mgmt-api": {
+      "title": "Face Catalog Management API",
+      "doc_ids": ["face-catalog-mgmt-api"],
+      "url": "https://docs.google.com/document/d/1U5GfP4-EyFp4H3wpqKm0CLfD3tVGbcTm69TLZyYH3aM",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 30
+    },
+    "face-data-retention": {
+      "title": "Face Data Retention Policy",
+      "doc_ids": ["face-data-retention"],
+      "url": "https://docs.google.com/document/d/1sW9Zxr-Wk-QwZnfM2U0a7OCJ9FpT9sSPVpcm0b6Ouro",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 30
+    },
+    "face-load-performance": {
+      "title": "Face Load/Performance Test Results",
+      "doc_ids": ["face-load-performance"],
+      "url": "https://docs.google.com/document/d/116Pq6kjsgt9_RFChmvbT6cNjKNNPKMctzziUMh-P7HE",
+      "last_ingested": "2026-03-18",
+      "stale_after_days": 60
     }
   },
   "4034101286": {
