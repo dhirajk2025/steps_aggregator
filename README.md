@@ -8,10 +8,10 @@ A knowledge base + compliance checklist system for new platform API development.
 
 ## How It Works
 
-1. **Process documents** (Confluence pages, PDFs) are ingested into ChromaDB for semantic search
+1. **Process documents** (Confluence pages, Google Docs, PDFs) are ingested into ChromaDB for semantic search
 2. **Beads** tracks per-API compliance as a two-tier epic structure: suite-level + per-API
 3. **AI agents** can query the knowledge base, audit GitHub repos, and detect compliance gaps
-4. **Jira integration** (once API permissions are configured) cross-references tickets against checklist items
+4. **Daily monitor** checks Confluence page versions, Google Doc staleness, and Jira epic status changes
 
 ## Knowledge Base (ChromaDB: `idme-processes`)
 
@@ -27,6 +27,7 @@ A knowledge base + compliance checklist system for new platform API development.
 | Data Retention | DRS design doc — team obligations, schema requirements, YAML contracts |
 | Legal/Privacy/Compliance | Informal process captured from team knowledge |
 | QA Strategy | AI-generated test cases, dev ownership, manual QA scope |
+| Face API | PRR doc, Enroll/Search/Delete/Compare/Liveness/Catalog/Trait API specs, ARB, DRS policy, load test results |
 
 ## Compliance Checklist Structure
 
@@ -62,69 +63,85 @@ Suite Epic (e.g., steps_aggregator-88v)        ← Legal, ARB, PRR, DRS — done
 Suite-level items (Legal, Compliance, PRD, ARB, API Council, Threat Model, DRS, PRR) apply to the whole service.
 Per-API items (OpenAPI spec, E2E tests, Observability/SLOs, CI/CD) apply to each individual API.
 
-## Auditing an Existing Service
+## Face API Compliance Status (PM-1313)
 
-To audit whether an existing service has met compliance requirements:
+Jira initiative: [PM-1313 — Biometrics (Faces)](https://idmeinc.atlassian.net/browse/PM-1313)
 
-### 1. GitHub Repo Scan (automated)
-Clone the repo (read-only) and check for:
-- `openapi-schema/` or `**/openapi.yaml` — OpenAPI specs
-- `**/features/*.feature` — Cucumber E2E tests
-- `.github/workflows/` — CI/CD pipelines
-- `Dockerfile` — container image tagging
-- `persistence/**/changesets/` — DB migrations (deleted_at, user_uuid)
-- `local-app-instance/otel-*.yml` — observability config
+### Completed Epics (IGAV project)
 
-### 2. Jira Search (requires `read:jira-work` scoped token + Browse Issues permission)
-```bash
-export JIRA_TOKEN="your-token"
-export JIRA_EMAIL="your@id.me"
-# Search for compliance tickets across IGAV, DEVLEG, COMP, BIO projects
-```
+| Epic | Description | Owner |
+|------|-------------|-------|
+| IGAV-704 | Face Template Storage (Enroll) API | Dhiraj Kulkarni |
+| IGAV-761 | Face 1:1 Compare API | Dhiraj Kulkarni |
+| IGAV-775 | Face 1:N Search API | Dhiraj Kulkarni |
+| IGAV-815 | Face Template Delete API | Dhiraj Kulkarni |
+| IGAV-781 | Face API Schema | Dhiraj Kulkarni |
+| IGAV-776 | Face API Framework | Dhiraj Kulkarni |
+| IGAV-886 | Face Liveness as an API | Gaurav Chaubal |
+| IGAV-896 | GRC Review | Gary Winklosky |
+| IGAV-899 | Production Readiness (PRR) — approved by Geoffrey Claro 2025-11-25 | Gaurav Chaubal |
+| IGAV-953 | Expose Face APIs to Ruby apps | Gary Winklosky |
+| IGAV-963 | Face Alignment with Skyfall architecture | Jayesh Mahajan |
+| IGAV-1227 | Face API Support for NCR Integration | Gyan Radhakrishnan |
 
-### 3. Confluence Search (requires Confluence API token)
-```bash
-python3 scripts/confluence_ingest.py
-```
+### In-Progress / Open Epics
 
-## Face API Audit Findings (hydra repo)
-
-| Item | Status | Notes |
-|------|--------|-------|
-| E2E tests — Enroll | ✅ | `SaveFaceTemplate.feature`, `FaceEnrollContentTypes.feature` |
-| E2E tests — Compare | ✅ | `CompareFaceTemplates.feature` |
-| E2E tests — Search | ✅ | `SearchFaceTemplate.feature` |
-| E2E tests — Delete | ✅ | `DeleteFaceTemplate.feature` |
-| E2E tests — Catalog | ✅ | `FaceCatalogManagement.feature` |
-| E2E tests — Liveness | ⚠️ | Has `FaceLivenessIT.java` but no Cucumber feature file |
-| OpenAPI spec — Enroll | ⚠️ | Internal Paravision adapter spec only; no public-facing spec |
-| OpenAPI spec — Compare/Search/Delete/Catalog/Liveness | ❌ | Not found in repo |
-| CI/CD pipelines | ✅ | GitHub Actions: build, release, integration tests, lint, coverage |
-| Container image tagging | ✅ | Maven auto-versions on merge; SNAPSHOT → release promotion |
-| Observability config | ⚠️ | OTel + Prometheus in local dev only; Grafana/Honeycomb managed externally |
-| DB schema — deleted_at | ✅ | Present on face_records, face_catalogs, cataloged_face_records, inspections |
-| DRS — delete strategy | 🚩 | Schema uses **soft delete** (`deleted_at IS NULL`); biometric data requires **hard delete** per DRS policy |
+| Epic | Description | Status | Owner |
+|------|-------------|--------|-------|
+| IGAV-1189 | Data Retention Work for Face Platform API | Refinement | Dhiraj Kulkarni |
+| IGAV-1155 | Face Trait API (POST) | Refinement | Jayesh Mahajan |
+| IGAV-1249 | Store Legal ID's face into new catalog | Refinement | Dhiraj Kulkarni |
+| IGAV-1091 | Face API Operational Improvements | Refinement | — |
+| IGAV-1126 | Face Catalog Management APIs | On Hold | Gyan Radhakrishnan |
 
 ## Scheduled Monitoring
 
-A GitHub Actions workflow (`confluence-monitor.yml`) runs daily at 9am UTC to detect Confluence page updates.
+A GitHub Actions workflow (`confluence-monitor.yml`) runs daily at 9am UTC. It checks three types of changes:
 
-### How it works
+### 1. Confluence Page Version Changes
 
-1. Reads `versions.json` (committed to repo) to know last-known versions
-2. Fetches current version from Confluence API for each tracked page
-3. On version change: calls Claude (`claude-sonnet-4-6`) to summarize what changed and which checklist phases are affected
-4. Commits updated `versions.json` to git (auditable version history)
-5. Opens a GitHub issue with the change summary and a review checklist
+Fetches current page versions from Confluence API. On change:
+- Calls Claude to summarize what changed and which compliance phases are affected
+- Commits updated `versions.json` (auditable history)
+- Opens a GitHub issue with review checklist
+
+**Tracked pages** (`versions.json`):
+- Production Readiness Review Process (`4034101286`)
+- Threat Modeling Service (`2512158864`)
+- API Council Operating Guide (`4100390931`)
+- Building APIs Guide (`3935502401`)
+- ADR 003 — API Versioning Strategy (`4039540737`)
+
+### 2. Google Doc Staleness
+
+Tracks last-ingested date for linked Google Docs. Alerts when a doc hasn't been re-ingested within its `stale_after_days` window.
+
+**Tracked docs** (`versions.json → gdrive_docs`):
+- PRR Template (30-day window)
+- Face API PRR doc (14-day window) — owner: gaurav.chaubal@id.me
+- Face Liveness ARB, Enroll/Search/Delete/Catalog API specs, Data Retention, Load Test Results (30–60 days)
+
+### 3. Jira Epic Status Changes
+
+Polls tracked IGAV epics via Jira REST API. Detects status transitions (e.g., Refinement → In Progress → Complete).
+
+**Tracked epics** (`versions.json → jira_epics`):
+| Epic | Phase | Current Status |
+|------|-------|----------------|
+| IGAV-1189 | Data Retention (DRS) | Refinement |
+| IGAV-1155 | Build (Trait API) | Refinement |
+| IGAV-1249 | Build (Legal ID catalog) | Refinement |
+| IGAV-1091 | Fast Follow (Ops) | Refinement |
+| IGAV-1126 | Build (Catalog Mgmt) | On Hold |
 
 ### Setup: GitHub Secrets
 
-Add these secrets at `Settings → Secrets and variables → Actions`:
+Add these at `Settings → Secrets and variables → Actions`:
 
 | Secret | Value |
 |--------|-------|
 | `CONFLUENCE_EMAIL` | `dhiraj.kulkarni@id.me` |
-| `CONFLUENCE_API_TOKEN` | Classic Atlassian token |
+| `CONFLUENCE_API_TOKEN` | Classic Atlassian token (used for both Confluence and Jira REST API) |
 | `ANTHROPIC_API_KEY` | Anthropic API key |
 
 ### Manual trigger
@@ -142,7 +159,7 @@ pip3 install requests anthropic
 python3 scripts/monitor.py
 ```
 
-Expected output when versions are current: `Result: 0 change(s) detected`
+Expected output when everything is current: `Result: 0 change(s) detected, 0 Jira epic change(s), 0 stale Google Doc(s)`
 
 ### Testing end-to-end
 
@@ -152,40 +169,46 @@ Temporarily lower a version number in `versions.json`, then run the monitor — 
 
 ### `scripts/monitor.py`
 
-Automated version-change monitor. Run by GitHub Actions daily; also runnable locally (see above).
+Automated daily monitor. Checks Confluence page versions, Google Doc staleness, and Jira epic status changes. Run by GitHub Actions; also runnable locally.
+
+### `scripts/create_issues.py`
+
+Creates GitHub issues for detected changes. Called by the workflow after `monitor.py` writes `/tmp/monitor-report.json`. Handles Confluence changes, stale Google Docs, and Jira epic status transitions.
 
 ### `scripts/confluence_ingest.py`
 
-Manual ingestion script. Fetches Confluence pages and saves content for MCP-based ChromaDB ingestion.
+Manual ingestion script. Fetches Confluence pages, extracts embedded Google Doc links, and saves content for MCP-based ChromaDB ingestion.
 
-**Setup:**
 ```bash
-export CONFLUENCE_EMAIL="your@idme.com"
+export CONFLUENCE_EMAIL="your@id.me"
 export CONFLUENCE_API_TOKEN="your-token"
 export CONFLUENCE_BASE_URL="https://idmeinc.atlassian.net"
 pip3 install requests
-```
-
-**Run:**
-```bash
 python3 scripts/confluence_ingest.py
 ```
 
-**Tracked pages:**
-- Production Readiness Review Process (`4034101286`)
-- Threat Modeling Service (`2512158864`)
-- API Council Operating Guide (`4100390931`)
-- Building APIs Guide (`3935502401`)
-- ADR 003 — Versioning (`4039540737`)
+## Adding New Tracking
 
-Add new pages to `PAGES_TO_TRACK` in the script.
+### New Confluence page
+Add to `PAGES_TO_TRACK` in `confluence_ingest.py` and add an entry to `versions.json`.
 
-## Adding New Processes
+### New Google Doc
+Add an entry under `gdrive_docs` in `versions.json` with `last_ingested`, `stale_after_days`, and optionally `jira_ticket` and `owner`.
 
-1. If it's a Confluence page: add the page ID to `PAGES_TO_TRACK` in `confluence_ingest.py`
-2. If it's a PDF: export and run through `pdf-chromadb-processor` agent
-3. If it's undocumented: describe it in a ChromaDB document with `source: team_knowledge`
-4. Once ingested, re-query ChromaDB to update the Beads epic checklist if needed
+### New Jira epic to monitor
+Add an entry under `jira_epics` in `versions.json`:
+```json
+"IGAV-XXXX": {
+  "title": "Epic title",
+  "status": "Refinement",
+  "owner": "email@id.me",
+  "phase": "Build",
+  "last_checked": "2026-03-18"
+}
+```
+
+### New process document (PDF or unstructured)
+Export as PDF and run through `pdf-chromadb-processor` agent, or describe it as a ChromaDB document with `source: team_knowledge`.
 
 ## Important Notes
 
@@ -193,4 +216,4 @@ Add new pages to `PAGES_TO_TRACK` in the script.
 - PDF process documents are excluded from git (internal company docs)
 - ChromaDB collection: `idme-processes`
 - Beads prefix: `steps_aggregator`
-- Jira API requires `read:jira-work` scoped classic token + Browse Issues project permission
+- The same Atlassian API token works for both Confluence and Jira REST APIs
