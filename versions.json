@@ -2,7 +2,11 @@
   "gdrive_docs": {
     "18waD6Rrhotlde6hJEw6mhGT7VDt5YHVj5KpjdG6oNxQ": {
       "title": "Production Readiness Review Template",
-      "doc_ids": ["prr-template-golive-mvp", "prr-template-fast-follow", "prr-template-planning"],
+      "doc_ids": [
+        "prr-template-golive-mvp",
+        "prr-template-fast-follow",
+        "prr-template-planning"
+      ],
       "url": "https://docs.google.com/document/d/18waD6Rrhotlde6hJEw6mhGT7VDt5YHVj5KpjdG6oNxQ",
       "source_confluence_page": "4034101286",
       "last_ingested": "2026-03-18",
@@ -14,34 +18,34 @@
     "version": 6,
     "doc_id": "prr-process",
     "category": "process",
-    "last_checked": "2026-03-11"
+    "last_checked": "2026-03-18"
   },
   "2512158864": {
     "title": "Threat Modeling Service",
-    "version": 19,
+    "version": 24,
     "doc_id": "threat-model",
     "category": "security",
-    "last_checked": "2026-03-11"
+    "last_checked": "2026-03-18"
   },
   "4100390931": {
     "title": "API Council Operating Guide",
     "version": 10,
     "doc_id": "api-council",
     "category": "process",
-    "last_checked": "2026-03-11"
+    "last_checked": "2026-03-18"
   },
   "3935502401": {
     "title": "Building APIs Guide",
     "version": 15,
     "doc_id": "building-apis",
     "category": "standards",
-    "last_checked": "2026-03-11"
+    "last_checked": "2026-03-18"
   },
   "4039540737": {
     "title": "ADR 003 - API Versioning Strategy",
     "version": 19,
     "doc_id": "adr-003-versioning",
     "category": "standards",
-    "last_checked": "2026-03-11"
+    "last_checked": "2026-03-18"
   }
 }
