@@ -106,6 +106,34 @@ class JiraClient:
         self._raise(resp)
         return resp.json()
 
+    def create_epic(
+        self,
+        project: str,
+        api_name: str,
+        description: str,
+        labels: list[str],
+        pm_epic_key: Optional[str] = None,
+        epic_link_field: Optional[str] = None,
+    ) -> str:
+        """Create an Epic issue for the API and return its key."""
+        fields: dict[str, Any] = {
+            "project": {"key": project},
+            "summary": f"[API] {api_name}",
+            "description": self._text_to_adf(description),
+            "issuetype": {"name": "Epic"},
+            "labels": labels,
+        }
+        # Some Jira instances require an explicit Epic Name field
+        for epic_name_field in ("customfield_10011", "customfield_10008"):
+            fields[epic_name_field] = api_name
+        if pm_epic_key and epic_link_field:
+            fields[epic_link_field] = pm_epic_key
+        payload = {"fields": fields}
+        resp = self._post("/rest/api/3/issue", payload)
+        if resp.status_code not in (200, 201):
+            raise JiraError(f"Failed to create epic: {resp.status_code} {resp.text}")
+        return resp.json()["key"]
+
     def build_issue_payload(
         self,
         project: str,

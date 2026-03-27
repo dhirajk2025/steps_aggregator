@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from .config import Config
 from .jira_client import JiraClient
 from .models import AuditResult, ChecklistStep, RequiredArtifact
-from .plan import slugify, step_jql
+from .plan import epic_jql, slugify, step_jql
 
 
 def run(
@@ -27,6 +27,10 @@ def run(
     api_slug = slugify(api_name)
     steps = config.steps
     status_map = config.jira_status_map
+
+    # Auto-resolve epic_key from IGAV epic label if not provided
+    if not epic_key:
+        epic_key = _resolve_epic_key(api_slug, config, client)
 
     # Determine mode: auto-detect fuzzy if labeled tickets are absent
     labeled_count = _count_labeled_tickets(api_slug, config, client)
@@ -68,6 +72,16 @@ def run(
         generated_at=datetime.now(timezone.utc).isoformat(),
         fuzzy_mode=use_fuzzy,
     )
+
+
+def _resolve_epic_key(api_slug: str, config: Config, client: JiraClient) -> Optional[str]:
+    """Find the IGAV epic for this API by label."""
+    results = client.search(
+        epic_jql(config.jira.project, api_slug),
+        fields=["summary"],
+        max_results=1,
+    )
+    return results[0]["key"] if results else None
 
 
 def _count_labeled_tickets(api_slug: str, config: Config, client: JiraClient) -> int:

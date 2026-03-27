@@ -44,8 +44,8 @@ def main(ctx: click.Context, config_path: Optional[str]) -> None:
 
 @main.command()
 @click.argument("api_name")
-@click.option("--epic", required=True, metavar="KEY",
-              help="Parent epic key (e.g. PM-1313).")
+@click.option("--pm-epic", "pm_epic_key", default=None, metavar="KEY",
+              help="Parent PM epic key to link from the new IGAV epic (e.g. PM-1313). Optional.")
 @click.option("--step", "step_ids", multiple=True, metavar="STEP_ID",
               help="Create only specific steps (e.g. --step step-2-arb). Repeatable.")
 @click.option("--dry-run", is_flag=True, default=False,
@@ -56,32 +56,37 @@ def main(ctx: click.Context, config_path: Optional[str]) -> None:
 def plan(
     ctx: click.Context,
     api_name: str,
-    epic: str,
+    pm_epic_key: Optional[str],
     step_ids: tuple[str, ...],
     dry_run: bool,
     json_flag: bool,
     markdown_flag: bool,
 ) -> None:
-    """Create Jira tickets for each checklist step.
+    """Create an IGAV epic and Jira tickets for each checklist step.
 
     API_NAME is the name of the API being developed (e.g. "Face API").
 
+    Creates a new IGAV epic for the API (or reuses one if it already exists),
+    then creates 7 checklist step tickets as children of that epic.
+
     Example:
-      api-checker plan "Face API" --epic PM-1313
+      api-checker plan "Face API"
+      api-checker plan "Face API" --pm-epic PM-1313
+      api-checker plan "Face API" --pm-epic PM-1313 --dry-run
     """
     try:
         config = load_config(ctx.obj.get("config_path"))
         client = JiraClient(config.jira)
-        steps = plan_mod.run(
+        result = plan_mod.run(
             api_name=api_name,
-            epic_key=epic,
             config=config,
             client=client,
+            pm_epic_key=pm_epic_key,
             step_ids=list(step_ids) if step_ids else None,
             dry_run=dry_run,
         )
         fmt = _output_fmt(json_flag, markdown_flag)
-        out = renderer.render_plan(steps, api_name, dry_run, fmt)
+        out = renderer.render_plan(result, api_name, dry_run, fmt)
         if out:
             click.echo(out)
     except ApiCheckerError as e:

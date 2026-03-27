@@ -12,6 +12,7 @@ from rich.text import Text
 from rich.panel import Panel
 
 from .models import AuditResult, ChecklistStep
+from .plan import PlanResult
 
 console = Console()
 err_console = Console(stderr=True)
@@ -30,29 +31,33 @@ STATUS_STYLES = {
 
 # ── Plan output ───────────────────────────────────────────────────────────────
 
-def render_plan(steps: list[ChecklistStep], api_name: str, dry_run: bool, fmt: str = "terminal") -> str:
+def render_plan(result: PlanResult, api_name: str, dry_run: bool, fmt: str = "terminal") -> str:
     if fmt == "json":
-        return _plan_json(steps, api_name, dry_run)
+        return _plan_json(result, api_name, dry_run)
     if fmt == "markdown":
-        return _plan_markdown(steps, api_name, dry_run)
-    _plan_rich(steps, api_name, dry_run)
+        return _plan_markdown(result, api_name, dry_run)
+    _plan_rich(result, api_name, dry_run)
     return ""
 
 
-def _plan_rich(steps: list[ChecklistStep], api_name: str, dry_run: bool) -> None:
+def _plan_rich(result: PlanResult, api_name: str, dry_run: bool) -> None:
     prefix = "[DRY RUN] " if dry_run else ""
-    table = Table(
-        title=f"{prefix}Plan: {api_name}",
-        box=box.ROUNDED,
-        show_lines=False,
-    )
+
+    # Epic summary line
+    if result.epic_key:
+        epic_action = "Created epic" if result.epic_created else "Reusing epic"
+        console.print(f"[bold]{prefix}{epic_action}:[/bold] [cyan]{result.epic_key}[/cyan] — {api_name}")
+    else:
+        console.print(f"[bold]{prefix}Epic:[/bold] [dim](would create)[/dim] — {api_name}")
+
+    table = Table(box=box.ROUNDED, show_lines=False, show_header=True)
     table.add_column("#", style="dim", width=3)
     table.add_column("Step", min_width=30)
     table.add_column("Status", width=10)
     table.add_column("Ticket", width=12)
     table.add_column("Notes")
 
-    for cs in steps:
+    for cs in result.steps:
         icon, style = STATUS_STYLES.get(cs.status, ("?", "default"))
         status_text = Text(f"{icon} {cs.status}", style=style)
         ticket = cs.jira_key or "—"
@@ -67,10 +72,12 @@ def _plan_rich(steps: list[ChecklistStep], api_name: str, dry_run: bool) -> None
     console.print(table)
 
 
-def _plan_json(steps: list[ChecklistStep], api_name: str, dry_run: bool) -> str:
+def _plan_json(result: PlanResult, api_name: str, dry_run: bool) -> str:
     return json.dumps({
         "api_name": api_name,
         "dry_run": dry_run,
+        "epic_key": result.epic_key,
+        "epic_created": result.epic_created,
         "steps": [
             {
                 "step_id": cs.definition.id,
@@ -80,18 +87,21 @@ def _plan_json(steps: list[ChecklistStep], api_name: str, dry_run: bool) -> str:
                 "jira_key": cs.jira_key,
                 "notes": cs.evidence,
             }
-            for cs in steps
+            for cs in result.steps
         ],
     }, indent=2)
 
 
-def _plan_markdown(steps: list[ChecklistStep], api_name: str, dry_run: bool) -> str:
+def _plan_markdown(result: PlanResult, api_name: str, dry_run: bool) -> str:
     lines = [f"## API Checker Plan: {api_name}", ""]
     if dry_run:
         lines.append("> **Dry run** — no tickets were created.\n")
+    if result.epic_key:
+        action = "Created" if result.epic_created else "Reusing"
+        lines.append(f"**Epic:** `{result.epic_key}` ({action})\n")
     lines.append("| # | Step | Status | Ticket |")
     lines.append("|---|------|--------|--------|")
-    for cs in steps:
+    for cs in result.steps:
         ticket = f"`{cs.jira_key}`" if cs.jira_key else "—"
         lines.append(f"| {cs.definition.order} | {cs.definition.name} | {cs.status} | {ticket} |")
     return "\n".join(lines)

@@ -1,7 +1,8 @@
-"""Plan subcommand: create Jira tickets for each checklist step."""
+"""Plan subcommand: create Jira epic + tickets for each checklist step."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional
 
 from .config import Config
@@ -15,8 +16,8 @@ def slugify(name: str) -> str:
     return name.lower().replace(" ", "-").replace("/", "-").replace("_", "-")
 
 
-def step_labels(step_id: str, api_slug: str, epic_slug: str) -> list[str]:
-    return ["api-checker", step_id, f"api-{api_slug}", f"epic-{epic_slug}"]
+def step_labels(step_id: str, api_slug: str, epic_key: str) -> list[str]:
+    return ["api-checker", step_id, f"api-{api_slug}", f"epic-{epic_key.lower()}"]
 
 
 def step_jql(project: str, step_id: str, api_slug: str) -> str:
@@ -26,36 +27,63 @@ def step_jql(project: str, step_id: str, api_slug: str) -> str:
     )
 
 
+def epic_jql(project: str, api_slug: str) -> str:
+    return (
+        f'project = "{project}" AND issuetype = Epic '
+        f'AND labels = "api-checker" AND labels = "api-{api_slug}"'
+    )
+
+
+@dataclass
+class PlanResult:
+    epic_key: Optional[str]
+    epic_created: bool
+    steps: list[ChecklistStep]
+
+
 def run(
     api_name: str,
-    epic_key: str,
     config: Config,
     client: JiraClient,
+    pm_epic_key: Optional[str] = None,
     step_ids: Optional[list[str]] = None,
     dry_run: bool = False,
-) -> list[ChecklistStep]:
-    """Create Jira tickets for the checklist steps. Returns created/skipped steps."""
-    # Validate epic exists (skip in dry-run)
-    if not dry_run:
-        try:
-            client.get_issue(epic_key)
-        except JiraNotFoundError:
-            raise JiraNotFoundError(f"Epic '{epic_key}' not found in Jira.")
+) -> PlanResult:
+    """
+    Create an IGAV epic for the API, then create checklist step tickets under it.
 
+    If an epic for this API already exists (matched by label), it is reused.
+    If pm_epic_key is provided, it is linked to the IGAV epic as a parent reference.
+    """
     api_slug = slugify(api_name)
-    epic_slug = epic_key.lower().replace("-", "").replace("_", "")
-    # Keep epic slug readable: pm-1313 → pm-1313
-    epic_slug = epic_key.lower()
 
+    # Validate PM epic if provided (skip in dry-run)
+    if pm_epic_key and not dry_run:
+        try:
+            client.get_issue(pm_epic_key)
+        except JiraNotFoundError:
+            raise JiraNotFoundError(f"PM epic '{pm_epic_key}' not found in Jira.")
+
+    # ── Step 1: Find or create the IGAV epic ─────────────────────────────────
+    epic_key, epic_created = _find_or_create_epic(
+        api_name=api_name,
+        api_slug=api_slug,
+        config=config,
+        client=client,
+        pm_epic_key=pm_epic_key,
+        dry_run=dry_run,
+    )
+
+    # ── Step 2: Create checklist step tickets under the epic ──────────────────
     steps_to_create = config.steps
     if step_ids:
         steps_to_create = [s for s in config.steps if s.id in step_ids]
 
     created: dict[str, str] = {}  # step_id -> jira_key
-    results: list[ChecklistStep] = []
+    step_results: list[ChecklistStep] = []
 
     for step in steps_to_create:
-        labels = step_labels(step.id, api_slug, epic_slug)
+        labels = step_labels(step.id, api_slug, epic_key or "pending")
         jql = step_jql(config.jira.project, step.id, api_slug)
         existing = client.search(jql, fields=["summary", "status", "assignee"], max_results=1)
 
@@ -68,13 +96,15 @@ def run(
                 status="skipped",
                 summary=existing[0]["fields"].get("summary", ""),
             )
-            cs.evidence.append(f"Already exists — skipped creation")
-            results.append(cs)
+            cs.evidence.append("Already exists — skipped creation")
+            step_results.append(cs)
             continue
 
-        summary = step.summary_template.format(api_name=api_name, epic_key=epic_key)
+        summary = step.summary_template.format(api_name=api_name, epic_key=epic_key or pm_epic_key or "")
         description = step.description_template.format(
-            api_name=api_name, epic_key=epic_key, step_name=step.name
+            api_name=api_name,
+            epic_key=epic_key or pm_epic_key or "",
+            step_name=step.name,
         )
 
         payload = client.build_issue_payload(
@@ -90,16 +120,16 @@ def run(
         if dry_run:
             created[step.id] = f"DRY-{step.order}"
             cs = ChecklistStep(definition=step, jira_key=None, status="dry-run", summary=summary)
-            cs.evidence.append(f"[dry-run] Would create: {summary}")
-            results.append(cs)
+            cs.evidence.append(f"[dry-run] Would create under epic {epic_key or '(new epic)'}")
+            step_results.append(cs)
         else:
             key = client.create_issue(payload)
             created[step.id] = key
             cs = ChecklistStep(definition=step, jira_key=key, status="created", summary=summary)
-            cs.evidence.append(f"Created successfully")
-            results.append(cs)
+            cs.evidence.append("Created successfully")
+            step_results.append(cs)
 
-    # Wire dependency links
+    # ── Step 3: Wire dependency links ─────────────────────────────────────────
     if not dry_run:
         for step in steps_to_create:
             if step.id not in created:
@@ -107,10 +137,46 @@ def run(
             inward_key = created[step.id]
             for blocked_id in step.blocks:
                 if blocked_id in created:
-                    outward_key = created[blocked_id]
                     try:
-                        client.create_link(inward_key, outward_key, link_type="Blocks")
+                        client.create_link(inward_key, created[blocked_id], link_type="Blocks")
                     except Exception:
-                        pass  # Link creation is best-effort
+                        pass  # Best-effort
 
-    return results
+    return PlanResult(epic_key=epic_key, epic_created=epic_created, steps=step_results)
+
+
+def _find_or_create_epic(
+    api_name: str,
+    api_slug: str,
+    config: Config,
+    client: JiraClient,
+    pm_epic_key: Optional[str],
+    dry_run: bool,
+) -> tuple[Optional[str], bool]:
+    """Return (epic_key, was_created). Returns (None, False) in dry-run."""
+    if dry_run:
+        return None, False
+
+    existing = client.search(
+        epic_jql(config.jira.project, api_slug),
+        fields=["summary"],
+        max_results=1,
+    )
+    if existing:
+        return existing[0]["key"], False
+
+    epic_labels = ["api-checker", f"api-{api_slug}"]
+    description = (
+        f"API development epic for {api_name}.\n\n"
+        f"Tracks all compliance checklist steps from due diligence through production deployment.\n"
+        + (f"\nParent PM epic: {pm_epic_key}" if pm_epic_key else "")
+    )
+    epic_key = client.create_epic(
+        project=config.jira.project,
+        api_name=api_name,
+        description=description,
+        labels=epic_labels,
+        pm_epic_key=pm_epic_key,
+        epic_link_field=config.jira.epic_link_field,
+    )
+    return epic_key, True
