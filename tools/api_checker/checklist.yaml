@@ -1,0 +1,339 @@
+version: "1.0"
+
+jira:
+  project: "IGAV"
+  parent_project: "PM"
+  epic_link_field: "customfield_10014"
+
+jira_status_map:
+  "To Do":       "todo"
+  "Open":        "todo"
+  "In Progress": "in-progress"
+  "In Review":   "in-progress"
+  "Code Review": "in-progress"
+  "Done":        "done"
+  "Closed":      "done"
+  "Complete":    "done"
+  "Won't Do":    "done"
+  "Resolved":    "done"
+  "Blocked":     "blocked"
+  "On Hold":     "blocked"
+
+steps:
+  - id: "step-1-due-diligence"
+    order: 1
+    name: "Due Diligence / POC"
+    issue_type: "Story"
+    optional: false
+    fuzzy_keywords:
+      - "due diligence"
+      - "poc"
+      - "proof of concept"
+      - "spike"
+      - "feasibility"
+      - "technical investigation"
+    summary_template: "[{api_name}] Step 1: Due Diligence & POC"
+    description_template: |
+      ## Due Diligence / Proof of Concept
+
+      **API:** {api_name}
+      **Parent Epic:** {epic_key}
+
+      ### Goal
+      Validate technical feasibility and understand integration surface before committing to design.
+
+      ### Acceptance Criteria
+      - [ ] Technology/library choices evaluated with trade-off notes documented
+      - [ ] POC code exists in a branch or spike ticket
+      - [ ] Key unknowns identified and resolved or risk-accepted
+      - [ ] DDD bounded context identified; Secoda glossary terms reviewed for domain alignment
+    labels:
+      - "api-checker"
+      - "step-1-due-diligence"
+    blocks:
+      - "step-2-arb"
+    required_artifacts:
+      - kind: "ticket_exists"
+      - kind: "jira_resolution"
+        value: "Done"
+    acceptance_criteria:
+      - "Technology choices documented"
+      - "POC branch or spike exists"
+      - "DDD bounded context identified"
+      - "Secoda glossary terms reviewed"
+
+  - id: "step-2-arb"
+    order: 2
+    name: "ARB/ADR + API Doc + API Council"
+    issue_type: "Story"
+    optional: false
+    fuzzy_keywords:
+      - "arb"
+      - "adr"
+      - "architecture review"
+      - "api council"
+      - "api design"
+      - "openapi"
+      - "swagger"
+      - "api doc"
+      - "api spec"
+      - "design document"
+    summary_template: "[{api_name}] Step 2: ARB/ADR, API Design & API Council Approval"
+    description_template: |
+      ## Architecture Review & API Council
+
+      **API:** {api_name}
+      **Parent Epic:** {epic_key}
+
+      ### Goal
+      Obtain architectural sign-off before development begins.
+
+      ### Acceptance Criteria
+      - [ ] ARB submitted (greenfield service) OR ADR written (pointed decision)
+      - [ ] OpenAPI / Protobuf spec drafted and attached or linked
+      - [ ] API Council submission prepared (see https://idmeinc.atlassian.net/wiki/spaces/EN/pages/4100390931)
+      - [ ] API Council approval recorded (meeting notes or async approval linked)
+      - [ ] All domain resource names aligned with Secoda-defined terminology
+      - [ ] Domain Driven Design bounded context reflected in API resource model
+    labels:
+      - "api-checker"
+      - "step-2-arb"
+    blocks:
+      - "step-3-compliance"
+      - "step-4-development"
+    required_artifacts:
+      - kind: "ticket_exists"
+      - kind: "jira_resolution"
+        value: "Done"
+      - kind: "confluence_link"
+    acceptance_criteria:
+      - "ARB or ADR documented and approved"
+      - "OpenAPI spec attached or linked"
+      - "API Council approval on record"
+      - "Secoda terminology aligned"
+
+  - id: "step-3-compliance"
+    order: 3
+    name: "Privacy / Legal / Compliance / Security Tickets"
+    issue_type: "Task"
+    optional: false
+    fuzzy_keywords:
+      - "privacy"
+      - "legal"
+      - "compliance"
+      - "security ticket"
+      - "jsm"
+      - "gdpr"
+      - "ccpa"
+      - "bipa"
+      - "pii"
+      - "biometric"
+      - "data classification"
+    summary_template: "[{api_name}] Step 3: Privacy, Legal, Compliance & Security Tickets"
+    description_template: |
+      ## Compliance Ticket Filing
+
+      **API:** {api_name}
+      **Parent Epic:** {epic_key}
+
+      ### Goal
+      Ensure all downstream compliance reviews are initiated before development is complete.
+
+      ### Acceptance Criteria
+      - [ ] Privacy review ticket filed (or waiver documented)
+      - [ ] Legal review ticket filed if PII or biometric data handled
+      - [ ] Security review ticket filed with threat model scope defined
+      - [ ] Compliance applicability assessed: SOC2, GDPR, CCPA, BIPA (biometric data)
+      - [ ] Data classification completed per DRS obligations
+    labels:
+      - "api-checker"
+      - "step-3-compliance"
+    blocks:
+      - "step-6-threat-model"
+    required_artifacts:
+      - kind: "ticket_exists"
+      - kind: "jira_resolution"
+        value: "Done"
+    acceptance_criteria:
+      - "Privacy ticket filed"
+      - "Legal review scoped"
+      - "Security ticket filed"
+      - "Compliance applicability documented"
+
+  - id: "step-4-development"
+    order: 4
+    name: "Development + Unit Tests + Code Coverage"
+    issue_type: "Story"
+    optional: false
+    fuzzy_keywords:
+      - "implementation"
+      - "development"
+      - "unit test"
+      - "code coverage"
+      - "feature branch"
+      - "sast"
+      - "coding"
+      - "build"
+    summary_template: "[{api_name}] Step 4: Development, Unit Tests & Code Coverage"
+    description_template: |
+      ## Development Gate
+
+      **API:** {api_name}
+      **Parent Epic:** {epic_key}
+
+      ### Goal
+      Track completion of implementation with quality gates enforced.
+
+      ### Acceptance Criteria
+      - [ ] Feature branch merged to main
+      - [ ] Unit test coverage >= 80% on new code
+      - [ ] Code review approved by at least 2 engineers
+      - [ ] No critical or high SAST findings unresolved
+      - [ ] API implementation consistent with Secoda domain model and DDD principles
+    labels:
+      - "api-checker"
+      - "step-4-development"
+    blocks:
+      - "step-5-staging"
+    required_artifacts:
+      - kind: "ticket_exists"
+      - kind: "jira_resolution"
+        value: "Done"
+    acceptance_criteria:
+      - "Branch merged"
+      - "80% unit test coverage"
+      - "2 code review approvals"
+      - "No unresolved critical SAST findings"
+
+  - id: "step-5-staging"
+    order: 5
+    name: "Staging: Integration + Load Testing"
+    issue_type: "Story"
+    optional: false
+    fuzzy_keywords:
+      - "staging"
+      - "integration test"
+      - "load test"
+      - "load testing"
+      - "k6"
+      - "performance test"
+      - "e2e"
+      - "end to end"
+      - "qa"
+    summary_template: "[{api_name}] Step 5: Staging Integration & Load Testing"
+    description_template: |
+      ## Staging Validation
+
+      **API:** {api_name}
+      **Parent Epic:** {epic_key}
+
+      ### Goal
+      Validate the API end-to-end under realistic load before production.
+
+      ### Acceptance Criteria
+      - [ ] Integration test suite passing in staging environment
+      - [ ] Load test (k6 or equivalent) run with targets defined and met
+      - [ ] Load test report linked in this ticket
+      - [ ] No P0/P1 bugs open from staging validation
+    labels:
+      - "api-checker"
+      - "step-5-staging"
+    blocks:
+      - "step-7-prr"
+    required_artifacts:
+      - kind: "ticket_exists"
+      - kind: "jira_resolution"
+        value: "Done"
+      - kind: "confluence_link"
+    acceptance_criteria:
+      - "Integration tests passing"
+      - "Load test report linked"
+      - "No open P0/P1 bugs"
+
+  - id: "step-6-threat-model"
+    order: 6
+    name: "Threat Model & Security Review"
+    issue_type: "Story"
+    optional: false
+    fuzzy_keywords:
+      - "threat model"
+      - "threat modeling"
+      - "pen test"
+      - "penetration test"
+      - "sast"
+      - "security review"
+      - "security findings"
+      - "vulnerability"
+    summary_template: "[{api_name}] Step 6: Threat Model & Security Review"
+    description_template: |
+      ## Security Sign-Off
+
+      **API:** {api_name}
+      **Parent Epic:** {epic_key}
+
+      ### Goal
+      Ensure all security concerns raised in step 3 are addressed before PRR.
+
+      ### Acceptance Criteria
+      - [ ] Threat model completed (see https://idmeinc.atlassian.net/wiki/spaces/EN/pages/2512158864)
+      - [ ] All High/Critical findings resolved or risk-accepted with documented rationale
+      - [ ] Pen test scheduled or waiver obtained
+      - [ ] SAST findings reviewed and triaged
+    labels:
+      - "api-checker"
+      - "step-6-threat-model"
+    blocks:
+      - "step-7-prr"
+    required_artifacts:
+      - kind: "ticket_exists"
+      - kind: "jira_resolution"
+        value: "Done"
+    acceptance_criteria:
+      - "Threat model complete"
+      - "All High/Critical findings resolved or risk-accepted"
+      - "Pen test scheduled or waived"
+
+  - id: "step-7-prr"
+    order: 7
+    name: "PRR Checklist + Production Deploy"
+    issue_type: "Story"
+    optional: false
+    fuzzy_keywords:
+      - "prr"
+      - "production readiness"
+      - "production readiness review"
+      - "go-live"
+      - "go live"
+      - "sre approval"
+      - "runbook"
+      - "deploy to prod"
+    summary_template: "[{api_name}] Step 7: PRR Checklist & Production Deployment"
+    description_template: |
+      ## Production Readiness Review
+
+      **API:** {api_name}
+      **Parent Epic:** {epic_key}
+
+      ### Goal
+      Complete the PRR process and obtain SRE approval to go to production.
+
+      ### Acceptance Criteria
+      - [ ] PRR template completed: https://docs.google.com/document/d/18waD6Rrhotlde6hJEw6mhGT7VDt5YHVj5KpjdG6oNxQ/copy
+      - [ ] SRE partner assigned and all checklist items resolved or risk-accepted
+      - [ ] Runbook linked in PRR document
+      - [ ] Alerts and dashboards configured
+      - [ ] SRE approval recorded; go-live date confirmed
+    labels:
+      - "api-checker"
+      - "step-7-prr"
+    blocks: []
+    required_artifacts:
+      - kind: "ticket_exists"
+      - kind: "jira_resolution"
+        value: "Done"
+      - kind: "confluence_link"
+    acceptance_criteria:
+      - "PRR template complete"
+      - "SRE approval on record"
+      - "Runbook linked"
+      - "Alerts and dashboards configured"

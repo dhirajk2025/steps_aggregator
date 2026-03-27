@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "api-checker"
+version = "0.1.0"
+description = "Plan, track, and audit API development compliance for ID.me engineering"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "requests>=2.31",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+api-checker = "api_checker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api_checker*"]
